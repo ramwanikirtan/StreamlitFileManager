@@ -224,8 +224,7 @@ def app():
             if st.button("Login"):
                 if verify_user(user_db, username, password):
                     st.session_state.logged_in = True
-                    st.session_state.username = username
-                    st.experimental_rerun()  # Rerun the app after login to show the file management system
+                    st.session_state.username = username  # Store the logged-in user's name
                 else:
                     st.error("Invalid credentials. Please try again.")
 
