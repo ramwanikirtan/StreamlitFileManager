@@ -2,30 +2,44 @@ import streamlit as st
 import os
 from pathlib import Path
 
-# Your existing functions (with minor adjustments) will go here
+# Simulate a simple user database
+USER_DB = {}
 
-def readfileandfolder():
-    path = Path('')
-    items = list(path.rglob('*'))  # Recursively list all files and folders
+# File Operations
+def create_user(username, password):
+    if username not in USER_DB:
+        USER_DB[username] = {"password": password, "files": []}
+        os.makedirs(f"./users/{username}", exist_ok=True)  # Create a directory for the user
+        return "User created successfully!"
+    else:
+        return "User already exists."
+
+def verify_user(username, password):
+    if username in USER_DB and USER_DB[username]["password"] == password:
+        return True
+    return False
+
+def readfileandfolder(username):
+    path = Path(f'./users/{username}')
+    items = list(path.rglob('*'))
     return items
 
-def createfile(name, data):
+def createfile(username, name, data):
     try:
-        items = readfileandfolder()
-        p = Path(name)
+        p = Path(f'./users/{username}/{name}')
         if not p.exists():
             with open(p, "w") as fs:
                 fs.write(data)
-            return "File created successfully!"
+            USER_DB[username]["files"].append(name)
+            return f"File '{name}' created successfully!"
         else:
             return "File already exists"
     except Exception as err:
         return f"Error: {err}"
 
-def readfile(name):
+def readfile(username, name):
     try:
-        items = readfileandfolder()
-        p = Path(name)
+        p = Path(f'./users/{username}/{name}')
         if p.exists() and p.is_file():
             with open(p, "r") as fs:
                 data = fs.read()
@@ -35,32 +49,33 @@ def readfile(name):
     except Exception as err:
         return f"Error: {err}"
 
-def updatefile(name, choice, new_name=None, new_data=None):
+def updatefile(username, name, choice, new_name=None, new_data=None):
     try:
-        items = readfileandfolder()
-        p = Path(name)
+        p = Path(f'./users/{username}/{name}')
         if p.exists() and p.is_file():
             if choice == 1:  # Rename
-                p.rename(new_name)
+                p.rename(f'./users/{username}/{new_name}')
+                USER_DB[username]["files"].remove(name)
+                USER_DB[username]["files"].append(new_name)
             elif choice == 2:  # Overwrite
                 with open(p, "w") as fs:
                     fs.write(new_data)
             elif choice == 3:  # Append
                 with open(p, "a") as fs:
                     fs.write(" " + new_data)
-            return "File updated successfully!"
+            return f"File '{name}' updated successfully!"
         else:
             return "File doesn't exist"
     except Exception as err:
         return f"Error: {err}"
 
-def deletefile(name):
+def deletefile(username, name):
     try:
-        items = readfileandfolder()
-        p = Path(name)
+        p = Path(f'./users/{username}/{name}')
         if p.exists() and p.is_file():
             os.remove(p)
-            return "File removed successfully!"
+            USER_DB[username]["files"].remove(name)
+            return f"File '{name}' removed successfully!"
         else:
             return "File doesn't exist"
     except Exception as err:
@@ -104,65 +119,83 @@ def app():
         </style>
         """, unsafe_allow_html=True)
 
+    # User authentication (login or register)
     st.title("🌐 File Management System")
-    st.subheader("A simple and sleek interface to manage your files with ease")
+    st.subheader("Secure and Personal File Management")
 
-    # Sidebar for navigation and file listing
-    st.sidebar.header("Available Files:")
-    files = readfileandfolder()
-    if files:
-        for file in files:
-            st.sidebar.text(file)
+    choice = st.selectbox("Select Operation", ["Login", "Register"])
 
-    # Sidebar operation options
-    option = st.sidebar.selectbox("Choose an operation", ("Create File", "Read File", "Update File", "Delete File"))
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
 
-    if option == "Create File":
-        st.header("Create a New File")
-        filename = st.text_input("Enter file name", placeholder="E.g., file.txt")
-        filecontent = st.text_area("Enter content for the file", placeholder="Type your content here...")
-
-        if st.button("Create File"):
-            message = createfile(filename, filecontent)
+    if choice == "Register":
+        if st.button("Create Account"):
+            message = create_user(username, password)
             st.success(message)
 
-    elif option == "Read File":
-        st.header("Read a File")
-        filename = st.text_input("Enter file name to read", placeholder="E.g., file.txt")
+    elif choice == "Login":
+        if st.button("Login"):
+            if verify_user(username, password):
+                st.success(f"Welcome back, {username}!")
+                user_files = readfileandfolder(username)
+                if user_files:
+                    st.sidebar.header("Your Files:")
+                    for file in USER_DB[username]["files"]:
+                        st.sidebar.text(file)
+                else:
+                    st.sidebar.text("No files yet. Create one!")
+                
+                option = st.sidebar.selectbox("Choose an operation", ("Create File", "Read File", "Update File", "Delete File"))
 
-        if st.button("Read File"):
-            content = readfile(filename)
-            if content != "File doesn't exist":
-                st.text_area("File Content", content, height=300)
+                if option == "Create File":
+                    st.header("Create a New File")
+                    filename = st.text_input("Enter file name", placeholder="E.g., file.txt")
+                    filecontent = st.text_area("Enter content for the file", placeholder="Type your content here...")
+
+                    if st.button("Create File"):
+                        message = createfile(username, filename, filecontent)
+                        st.success(message)
+
+                elif option == "Read File":
+                    st.header("Read a File")
+                    filename = st.text_input("Enter file name to read", placeholder="E.g., file.txt")
+
+                    if st.button("Read File"):
+                        content = readfile(username, filename)
+                        if content != "File doesn't exist":
+                            st.text_area("File Content", content, height=300)
+                        else:
+                            st.error(content)
+
+                elif option == "Update File":
+                    st.header("Update an Existing File")
+                    filename = st.text_input("Enter file name to update", placeholder="E.g., file.txt")
+                    operation_choice = st.radio("Choose operation", ("Rename", "Overwrite", "Append"))
+
+                    if operation_choice == "Rename":
+                        new_filename = st.text_input("Enter new file name", placeholder="E.g., newfile.txt")
+                    elif operation_choice in ["Overwrite", "Append"]:
+                        new_content = st.text_area("Enter new content", placeholder="Type new content here...")
+
+                    if st.button("Update File"):
+                        if operation_choice == "Rename":
+                            message = updatefile(username, filename, 1, new_filename)
+                        elif operation_choice == "Overwrite":
+                            message = updatefile(username, filename, 2, new_data=new_content)
+                        elif operation_choice == "Append":
+                            message = updatefile(username, filename, 3, new_data=new_content)
+                        st.success(message)
+
+                elif option == "Delete File":
+                    st.header("Delete a File")
+                    filename = st.text_input("Enter file name to delete", placeholder="E.g., file.txt")
+
+                    if st.button("Delete File"):
+                        message = deletefile(username, filename)
+                        st.success(message)
+
             else:
-                st.error(content)
-
-    elif option == "Update File":
-        st.header("Update an Existing File")
-        filename = st.text_input("Enter file name to update", placeholder="E.g., file.txt")
-        operation_choice = st.radio("Choose operation", ("Rename", "Overwrite", "Append"))
-
-        if operation_choice == "Rename":
-            new_filename = st.text_input("Enter new file name", placeholder="E.g., newfile.txt")
-        elif operation_choice in ["Overwrite", "Append"]:
-            new_content = st.text_area("Enter new content", placeholder="Type new content here...")
-
-        if st.button("Update File"):
-            if operation_choice == "Rename":
-                message = updatefile(filename, 1, new_filename)
-            elif operation_choice == "Overwrite":
-                message = updatefile(filename, 2, new_data=new_content)
-            elif operation_choice == "Append":
-                message = updatefile(filename, 3, new_data=new_content)
-            st.success(message)
-
-    elif option == "Delete File":
-        st.header("Delete a File")
-        filename = st.text_input("Enter file name to delete", placeholder="E.g., file.txt")
-
-        if st.button("Delete File"):
-            message = deletefile(filename)
-            st.success(message)
+                st.error("Invalid credentials. Please try again.")
 
 if __name__ == "__main__":
     app()
