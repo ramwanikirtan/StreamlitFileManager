@@ -64,7 +64,7 @@ def readfile(username, name):
     except Exception as err:
         return f"Error: {err}"
 
-def updatefile(username, name, choice, new_name=None, new_data=None, user_db):
+def updatefile(username, name, choice, user_db, new_name=None, new_data=None):
     try:
         p = Path(f'./users/{username}/{name}')
         if p.exists() and p.is_file():
@@ -199,7 +199,7 @@ def app():
 
                     if st.button("Update File"):
                         if operation_choice == "Rename":
-                            message = updatefile(username, filename, 1, new_filename, user_db)
+                            message = updatefile(username, filename, 1, user_db, new_filename)
                         elif operation_choice == "Overwrite":
                             message = updatefile(username, filename, 2, new_data=new_content, user_db=user_db)
                         elif operation_choice == "Append":
