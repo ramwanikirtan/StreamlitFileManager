@@ -104,6 +104,12 @@ def app():
     # Load or create the user database
     user_db = load_user_db()
 
+    # Set up session state
+    if "logged_in" not in st.session_state:
+        st.session_state.logged_in = False
+    if "username" not in st.session_state:
+        st.session_state.username = ""
+
     # Custom CSS for the app
     st.markdown("""
         <style>
@@ -140,82 +146,88 @@ def app():
         """, unsafe_allow_html=True)
 
     # User authentication (login or register)
-    st.title("🌐 File Management System")
-    st.subheader("Secure and Personal File Management")
+    if st.session_state.logged_in:
+        # Show file management system
+        st.title("🌐 File Management System")
+        st.subheader(f"Welcome {st.session_state.username}!")
+        
+        user_files = readfileandfolder(st.session_state.username)
+        if user_files:
+            st.sidebar.header("Your Files:")
+            for file in user_db[st.session_state.username]["files"]:
+                st.sidebar.text(file)
+        else:
+            st.sidebar.text("No files yet. Create one!")
+        
+        option = st.sidebar.selectbox("Choose an operation", ("Create File", "Read File", "Update File", "Delete File"))
 
-    choice = st.selectbox("Select Operation", ["Login", "Register"])
+        if option == "Create File":
+            st.header("Create a New File")
+            filename = st.text_input("Enter file name", placeholder="E.g., file.txt")
+            filecontent = st.text_area("Enter content for the file", placeholder="Type your content here...")
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+            if st.button("Create File"):
+                message = createfile(st.session_state.username, filename, filecontent, user_db)
+                st.success(message)
 
-    if choice == "Register":
-        if st.button("Create Account"):
-            message = create_user(user_db, username, password)
-            st.success(message)
+        elif option == "Read File":
+            st.header("Read a File")
+            filename = st.text_input("Enter file name to read", placeholder="E.g., file.txt")
 
-    elif choice == "Login":
-        if st.button("Login"):
-            if verify_user(user_db, username, password):
-                st.success(f"Welcome back, {username}!")
-                user_files = readfileandfolder(username)
-                if user_files:
-                    st.sidebar.header("Your Files:")
-                    for file in user_db[username]["files"]:
-                        st.sidebar.text(file)
+            if st.button("Read File"):
+                content = readfile(st.session_state.username, filename)
+                if content != "File doesn't exist":
+                    st.text_area("File Content", content, height=300)
                 else:
-                    st.sidebar.text("No files yet. Create one!")
-                
-                option = st.sidebar.selectbox("Choose an operation", ("Create File", "Read File", "Update File", "Delete File"))
+                    st.error(content)
 
-                if option == "Create File":
-                    st.header("Create a New File")
-                    filename = st.text_input("Enter file name", placeholder="E.g., file.txt")
-                    filecontent = st.text_area("Enter content for the file", placeholder="Type your content here...")
+        elif option == "Update File":
+            st.header("Update an Existing File")
+            filename = st.text_input("Enter file name to update", placeholder="E.g., file.txt")
+            operation_choice = st.radio("Choose operation", ("Rename", "Overwrite", "Append"))
 
-                    if st.button("Create File"):
-                        message = createfile(username, filename, filecontent, user_db)
-                        st.success(message)
+            if operation_choice == "Rename":
+                new_filename = st.text_input("Enter new file name", placeholder="E.g., newfile.txt")
+            elif operation_choice in ["Overwrite", "Append"]:
+                new_content = st.text_area("Enter new content", placeholder="Type new content here...")
 
-                elif option == "Read File":
-                    st.header("Read a File")
-                    filename = st.text_input("Enter file name to read", placeholder="E.g., file.txt")
+            if st.button("Update File"):
+                if operation_choice == "Rename":
+                    message = updatefile(st.session_state.username, filename, 1, user_db, new_filename)
+                elif operation_choice == "Overwrite":
+                    message = updatefile(st.session_state.username, filename, 2, new_data=new_content, user_db=user_db)
+                elif operation_choice == "Append":
+                    message = updatefile(st.session_state.username, filename, 3, new_data=new_content, user_db=user_db)
+                st.success(message)
 
-                    if st.button("Read File"):
-                        content = readfile(username, filename)
-                        if content != "File doesn't exist":
-                            st.text_area("File Content", content, height=300)
-                        else:
-                            st.error(content)
+        elif option == "Delete File":
+            st.header("Delete a File")
+            filename = st.text_input("Enter file name to delete", placeholder="E.g., file.txt")
 
-                elif option == "Update File":
-                    st.header("Update an Existing File")
-                    filename = st.text_input("Enter file name to update", placeholder="E.g., file.txt")
-                    operation_choice = st.radio("Choose operation", ("Rename", "Overwrite", "Append"))
+            if st.button("Delete File"):
+                message = deletefile(st.session_state.username, filename, user_db)
+                st.success(message)
 
-                    if operation_choice == "Rename":
-                        new_filename = st.text_input("Enter new file name", placeholder="E.g., newfile.txt")
-                    elif operation_choice in ["Overwrite", "Append"]:
-                        new_content = st.text_area("Enter new content", placeholder="Type new content here...")
+    else:
+        # Display login/register form if not logged in
+        choice = st.selectbox("Select Operation", ["Login", "Register"])
 
-                    if st.button("Update File"):
-                        if operation_choice == "Rename":
-                            message = updatefile(username, filename, 1, user_db, new_filename)
-                        elif operation_choice == "Overwrite":
-                            message = updatefile(username, filename, 2, new_data=new_content, user_db=user_db)
-                        elif operation_choice == "Append":
-                            message = updatefile(username, filename, 3, new_data=new_content, user_db=user_db)
-                        st.success(message)
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
 
-                elif option == "Delete File":
-                    st.header("Delete a File")
-                    filename = st.text_input("Enter file name to delete", placeholder="E.g., file.txt")
+        if choice == "Register":
+            if st.button("Create Account"):
+                message = create_user(user_db, username, password)
+                st.success(message)
 
-                    if st.button("Delete File"):
-                        message = deletefile(username, filename, user_db)
-                        st.success(message)
-
-            else:
-                st.error("Invalid credentials. Please try again.")
+        elif choice == "Login":
+            if st.button("Login"):
+                if verify_user(user_db, username, password):
+                    st.session_state.logged_in = True
+                    st.session_state.username = username
+                    st.experimental_rerun()  # Rerun the app after login to show the file management system
+                else:
+                    st.error("Invalid credentials. Please try again.")
 
 if __name__ == "__main__":
     app()
