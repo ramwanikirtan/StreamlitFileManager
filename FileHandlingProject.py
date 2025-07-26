@@ -1,36 +1,51 @@
 import streamlit as st
 import os
+import json
 from pathlib import Path
 
-# Simulate a simple user database
-USER_DB = {}
+# Load the user database from a JSON file
+def load_user_db():
+    if os.path.exists("users.json"):
+        with open("users.json", "r") as f:
+            return json.load(f)
+    else:
+        return {}
 
-# File Operations
-def create_user(username, password):
-    if username not in USER_DB:
-        USER_DB[username] = {"password": password, "files": []}
+# Save the user database to a JSON file
+def save_user_db(user_db):
+    with open("users.json", "w") as f:
+        json.dump(user_db, f, indent=4)
+
+# Create user in the database
+def create_user(user_db, username, password):
+    if username not in user_db:
+        user_db[username] = {"password": password, "files": []}
         os.makedirs(f"./users/{username}", exist_ok=True)  # Create a directory for the user
+        save_user_db(user_db)  # Save changes to the file
         return "User created successfully!"
     else:
         return "User already exists."
 
-def verify_user(username, password):
-    if username in USER_DB and USER_DB[username]["password"] == password:
+# Verify user credentials
+def verify_user(user_db, username, password):
+    if username in user_db and user_db[username]["password"] == password:
         return True
     return False
 
+# File operations (create, read, update, delete)
 def readfileandfolder(username):
     path = Path(f'./users/{username}')
     items = list(path.rglob('*'))
     return items
 
-def createfile(username, name, data):
+def createfile(username, name, data, user_db):
     try:
         p = Path(f'./users/{username}/{name}')
         if not p.exists():
             with open(p, "w") as fs:
                 fs.write(data)
-            USER_DB[username]["files"].append(name)
+            user_db[username]["files"].append(name)
+            save_user_db(user_db)  # Save user data with new file
             return f"File '{name}' created successfully!"
         else:
             return "File already exists"
@@ -49,32 +64,34 @@ def readfile(username, name):
     except Exception as err:
         return f"Error: {err}"
 
-def updatefile(username, name, choice, new_name=None, new_data=None):
+def updatefile(username, name, choice, new_name=None, new_data=None, user_db):
     try:
         p = Path(f'./users/{username}/{name}')
         if p.exists() and p.is_file():
             if choice == 1:  # Rename
                 p.rename(f'./users/{username}/{new_name}')
-                USER_DB[username]["files"].remove(name)
-                USER_DB[username]["files"].append(new_name)
+                user_db[username]["files"].remove(name)
+                user_db[username]["files"].append(new_name)
             elif choice == 2:  # Overwrite
                 with open(p, "w") as fs:
                     fs.write(new_data)
             elif choice == 3:  # Append
                 with open(p, "a") as fs:
                     fs.write(" " + new_data)
+            save_user_db(user_db)  # Save user data with updated file list
             return f"File '{name}' updated successfully!"
         else:
             return "File doesn't exist"
     except Exception as err:
         return f"Error: {err}"
 
-def deletefile(username, name):
+def deletefile(username, name, user_db):
     try:
         p = Path(f'./users/{username}/{name}')
         if p.exists() and p.is_file():
             os.remove(p)
-            USER_DB[username]["files"].remove(name)
+            user_db[username]["files"].remove(name)
+            save_user_db(user_db)  # Save user data with updated file list
             return f"File '{name}' removed successfully!"
         else:
             return "File doesn't exist"
@@ -84,6 +101,9 @@ def deletefile(username, name):
 # Streamlit UI
 
 def app():
+    # Load or create the user database
+    user_db = load_user_db()
+
     # Custom CSS for the app
     st.markdown("""
         <style>
@@ -130,17 +150,17 @@ def app():
 
     if choice == "Register":
         if st.button("Create Account"):
-            message = create_user(username, password)
+            message = create_user(user_db, username, password)
             st.success(message)
 
     elif choice == "Login":
         if st.button("Login"):
-            if verify_user(username, password):
+            if verify_user(user_db, username, password):
                 st.success(f"Welcome back, {username}!")
                 user_files = readfileandfolder(username)
                 if user_files:
                     st.sidebar.header("Your Files:")
-                    for file in USER_DB[username]["files"]:
+                    for file in user_db[username]["files"]:
                         st.sidebar.text(file)
                 else:
                     st.sidebar.text("No files yet. Create one!")
@@ -153,7 +173,7 @@ def app():
                     filecontent = st.text_area("Enter content for the file", placeholder="Type your content here...")
 
                     if st.button("Create File"):
-                        message = createfile(username, filename, filecontent)
+                        message = createfile(username, filename, filecontent, user_db)
                         st.success(message)
 
                 elif option == "Read File":
@@ -179,11 +199,11 @@ def app():
 
                     if st.button("Update File"):
                         if operation_choice == "Rename":
-                            message = updatefile(username, filename, 1, new_filename)
+                            message = updatefile(username, filename, 1, new_filename, user_db)
                         elif operation_choice == "Overwrite":
-                            message = updatefile(username, filename, 2, new_data=new_content)
+                            message = updatefile(username, filename, 2, new_data=new_content, user_db=user_db)
                         elif operation_choice == "Append":
-                            message = updatefile(username, filename, 3, new_data=new_content)
+                            message = updatefile(username, filename, 3, new_data=new_content, user_db=user_db)
                         st.success(message)
 
                 elif option == "Delete File":
@@ -191,7 +211,7 @@ def app():
                     filename = st.text_input("Enter file name to delete", placeholder="E.g., file.txt")
 
                     if st.button("Delete File"):
-                        message = deletefile(username, filename)
+                        message = deletefile(username, filename, user_db)
                         st.success(message)
 
             else:
