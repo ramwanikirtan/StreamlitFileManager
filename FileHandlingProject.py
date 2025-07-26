@@ -107,14 +107,14 @@ def app():
     st.title("🌐 File Management System")
     st.subheader("A simple and sleek interface to manage your files with ease")
 
-    # Display available files
-    st.header("Current Files in Directory:")
+    # Sidebar for navigation and file listing
+    st.sidebar.header("Available Files:")
     files = readfileandfolder()
     if files:
         for file in files:
-            st.text(file)
+            st.sidebar.text(file)
 
-    # Sidebar for navigation
+    # Sidebar operation options
     option = st.sidebar.selectbox("Choose an operation", ("Create File", "Read File", "Update File", "Delete File"))
 
     if option == "Create File":
