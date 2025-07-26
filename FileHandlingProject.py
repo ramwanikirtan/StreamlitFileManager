@@ -6,7 +6,7 @@ from pathlib import Path
 
 def readfileandfolder():
     path = Path('')
-    items = list(path.rglob('*'))
+    items = list(path.rglob('*'))  # Recursively list all files and folders
     return items
 
 def createfile(name, data):
@@ -106,6 +106,13 @@ def app():
 
     st.title("🌐 File Management System")
     st.subheader("A simple and sleek interface to manage your files with ease")
+
+    # Display available files
+    st.header("Current Files in Directory:")
+    files = readfileandfolder()
+    if files:
+        for file in files:
+            st.text(file)
 
     # Sidebar for navigation
     option = st.sidebar.selectbox("Choose an operation", ("Create File", "Read File", "Update File", "Delete File"))
